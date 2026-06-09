@@ -105,7 +105,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.2.1")
 
     // LiteRT-LM
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.12.0")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
 
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
