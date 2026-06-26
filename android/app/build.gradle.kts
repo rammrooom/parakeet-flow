@@ -106,8 +106,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
 
     // Hilt (KSP instead of kapt)
-    implementation("com.google.dagger:hilt-android:2.59.2")
-    ksp("com.google.dagger:hilt-compiler:2.59.2")
+    implementation("com.google.dagger:hilt-android:2.60")
+    ksp("com.google.dagger:hilt-compiler:2.60")
     implementation("androidx.hilt:hilt-navigation-compose:1.3.0")
 
     // DataStore
