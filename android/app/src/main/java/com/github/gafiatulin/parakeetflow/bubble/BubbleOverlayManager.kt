@@ -67,6 +67,7 @@ class BubbleOverlayManager @Inject constructor() {
     // Current position (Gravity.TOP | Gravity.LEFT coordinates)
     private var currentX = 0
     private var currentY = 0
+    private var minBubbleY = 0  // highest Y the bubble can reach (negative = over status bar)
 
     // Dismiss target center (bottom center of screen)
     private var dismissCenterX = 0
@@ -113,13 +114,18 @@ class BubbleOverlayManager @Inject constructor() {
         // Offset default position so the visible circle sits at the screen edge.
         val containerPaddingPx = ((BUBBLE_SIZE_DP - 64) / 2 * density).toInt()
 
+        // Allow the visible bubble to be dragged all the way to the top of the
+        // screen (over the status bar), matching apps like Whisperian. The
+        // overlay already uses FLAG_LAYOUT_NO_LIMITS so it can render up there.
+        minBubbleY = -containerPaddingPx
+
         // Restore position or default to right edge, center
         if (initialPosition.x >= 0 && initialPosition.y >= 0) {
             currentX = initialPosition.x.coerceIn(
                 EDGE_MARGIN_PX - containerPaddingPx,
                 screenWidth - bubbleSizePx - EDGE_MARGIN_PX + containerPaddingPx
             )
-            currentY = initialPosition.y.coerceIn(0, maxBubbleY)
+            currentY = initialPosition.y.coerceIn(minBubbleY, maxBubbleY)
         } else {
             currentX = screenWidth - bubbleSizePx - EDGE_MARGIN_PX + containerPaddingPx
             currentY = screenHeight / 2 - bubbleSizePx / 2
@@ -177,7 +183,7 @@ class BubbleOverlayManager @Inject constructor() {
     private fun handleDrag(delta: Offset) {
         // Always move the bubble with the finger — never reposition the window independently
         currentX = (currentX + delta.x.toInt()).coerceIn(0, screenWidth - bubbleSizePx)
-        currentY = (currentY + delta.y.toInt()).coerceIn(0, screenHeight - bubbleSizePx)
+        currentY = (currentY + delta.y.toInt()).coerceIn(minBubbleY, screenHeight - bubbleSizePx)
         updateBubblePosition()
 
         // Calculate distance from bubble center to dismiss target
