@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.github.gafiatulin.parakeetflow.core.model.BubblePosition
+import com.github.gafiatulin.parakeetflow.core.model.MdContentMode
 import com.github.gafiatulin.parakeetflow.core.model.UserSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +35,12 @@ class PreferencesDataStore @Inject constructor(
         val LLM_GPU = booleanPreferencesKey("llm_gpu")
         val LINGERING_BUBBLE = booleanPreferencesKey("lingering_bubble")
         val HF_TOKEN = stringPreferencesKey("hf_token")
+        val MD_EXPORT_ENABLED = booleanPreferencesKey("md_export_enabled")
+        val EXPORT_FOLDER_URI = stringPreferencesKey("export_folder_uri")
+        val MD_CONTENT_MODE = stringPreferencesKey("md_content_mode")
+        val MD_FRONTMATTER = booleanPreferencesKey("md_frontmatter")
+        val AUDIO_EXPORT_ENABLED = booleanPreferencesKey("audio_export_enabled")
+        val AUDIO_FOLDER_URI = stringPreferencesKey("audio_folder_uri")
     }
 
     val settings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -50,7 +57,15 @@ class PreferencesDataStore @Inject constructor(
             autoPunctuation = prefs[Keys.AUTO_PUNCTUATION] ?: true,
             llmGpu = prefs[Keys.LLM_GPU] ?: true,
             lingeringBubble = prefs[Keys.LINGERING_BUBBLE] ?: false,
-            hfToken = prefs[Keys.HF_TOKEN] ?: ""
+            hfToken = prefs[Keys.HF_TOKEN] ?: "",
+            mdExportEnabled = prefs[Keys.MD_EXPORT_ENABLED] ?: false,
+            exportFolderUri = prefs[Keys.EXPORT_FOLDER_URI] ?: "",
+            mdContentMode = prefs[Keys.MD_CONTENT_MODE]
+                ?.let { runCatching { MdContentMode.valueOf(it) }.getOrNull() }
+                ?: MdContentMode.FINAL,
+            mdFrontmatter = prefs[Keys.MD_FRONTMATTER] ?: true,
+            audioExportEnabled = prefs[Keys.AUDIO_EXPORT_ENABLED] ?: false,
+            audioFolderUri = prefs[Keys.AUDIO_FOLDER_URI] ?: ""
         )
     }
 
@@ -95,5 +110,29 @@ class PreferencesDataStore @Inject constructor(
 
     suspend fun setHfToken(token: String) {
         context.dataStore.edit { it[Keys.HF_TOKEN] = token }
+    }
+
+    suspend fun setMdExportEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.MD_EXPORT_ENABLED] = enabled }
+    }
+
+    suspend fun setExportFolderUri(uri: String) {
+        context.dataStore.edit { it[Keys.EXPORT_FOLDER_URI] = uri }
+    }
+
+    suspend fun setMdContentMode(mode: MdContentMode) {
+        context.dataStore.edit { it[Keys.MD_CONTENT_MODE] = mode.name }
+    }
+
+    suspend fun setMdFrontmatter(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.MD_FRONTMATTER] = enabled }
+    }
+
+    suspend fun setAudioExportEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.AUDIO_EXPORT_ENABLED] = enabled }
+    }
+
+    suspend fun setAudioFolderUri(uri: String) {
+        context.dataStore.edit { it[Keys.AUDIO_FOLDER_URI] = uri }
     }
 }

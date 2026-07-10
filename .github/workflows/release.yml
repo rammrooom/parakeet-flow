@@ -117,24 +117,42 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Create signing keystore
+      - name: Set up signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
-          KEYSTORE_PASSWORD="$(openssl rand -base64 32)"
 
-          keytool -genkeypair \
-            -alias release \
-            -keyalg RSA -keysize 2048 \
-            -validity 1 \
-            -keystore "$KEYSTORE_PATH" \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -keypass "$KEYSTORE_PASSWORD" \
-            -dname "CN=ParakeetFlow, O=ParakeetFlow"
-
-          echo "RELEASE_KEYSTORE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_ALIAS=release" >> "$GITHUB_ENV"
-          echo "RELEASE_KEY_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            # Persistent keystore from repository secrets — APKs share one
+            # signature, so new versions install over old ones (see docs/SIGNING.md).
+            echo "Using persistent keystore from repository secrets"
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+            echo "RELEASE_KEYSTORE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "RELEASE_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            # Fallback: ephemeral keystore. Each release is signed with a fresh
+            # key, so updates require uninstalling the previous version first.
+            echo "No RELEASE_KEYSTORE_BASE64 secret set — generating an ephemeral keystore"
+            GEN_PASSWORD="$(openssl rand -base64 32)"
+            keytool -genkeypair \
+              -alias release \
+              -keyalg RSA -keysize 2048 \
+              -validity 10000 \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "$GEN_PASSWORD" \
+              -keypass "$GEN_PASSWORD" \
+              -dname "CN=ParakeetFlow, O=ParakeetFlow"
+            echo "RELEASE_KEYSTORE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "RELEASE_KEYSTORE_PASSWORD=$GEN_PASSWORD" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_ALIAS=release" >> "$GITHUB_ENV"
+            echo "RELEASE_KEY_PASSWORD=$GEN_PASSWORD" >> "$GITHUB_ENV"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
