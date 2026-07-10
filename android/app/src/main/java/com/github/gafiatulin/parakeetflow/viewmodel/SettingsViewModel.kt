@@ -2,6 +2,7 @@ package com.github.gafiatulin.parakeetflow.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.gafiatulin.parakeetflow.core.model.MdContentMode
 import com.github.gafiatulin.parakeetflow.core.model.UserSettings
 import com.github.gafiatulin.parakeetflow.core.preferences.PreferencesDataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,5 +46,29 @@ class SettingsViewModel @Inject constructor(
 
     fun setHfToken(token: String) {
         viewModelScope.launch { preferencesDataStore.setHfToken(token) }
+    }
+
+    fun setMdExportEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setMdExportEnabled(enabled) }
+    }
+
+    fun setExportFolderUri(uri: String) {
+        viewModelScope.launch { preferencesDataStore.setExportFolderUri(uri) }
+    }
+
+    fun setMdContentMode(mode: MdContentMode) {
+        viewModelScope.launch { preferencesDataStore.setMdContentMode(mode) }
+    }
+
+    fun setMdFrontmatter(enabled: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setMdFrontmatter(enabled) }
+    }
+
+    fun setAudioExportEnabled(enabled: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setAudioExportEnabled(enabled) }
+    }
+
+    fun setAudioFolderUri(uri: String) {
+        viewModelScope.launch { preferencesDataStore.setAudioFolderUri(uri) }
     }
 }

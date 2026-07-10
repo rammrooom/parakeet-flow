@@ -3,6 +3,7 @@ package com.github.gafiatulin.parakeetflow.ui.screen
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
@@ -27,6 +28,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.github.gafiatulin.parakeetflow.core.model.AsrModel
+import com.github.gafiatulin.parakeetflow.core.model.MdContentMode
 import com.github.gafiatulin.parakeetflow.core.model.ModelStatus
 import com.github.gafiatulin.parakeetflow.service.DictationService
 import com.github.gafiatulin.parakeetflow.ui.component.ModelStatusCard
@@ -87,6 +89,30 @@ fun SettingsScreen(
             context.startForegroundService(intent)
         } else {
             Toast.makeText(context, "Microphone permission required", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val exportFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            settingsViewModel.setExportFolderUri(it.toString())
+        }
+    }
+
+    val audioFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            settingsViewModel.setAudioFolderUri(it.toString())
         }
     }
 
@@ -371,6 +397,105 @@ fun SettingsScreen(
                     )
                 }
             )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Text(
+                "Transcript Export",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            ListItem(
+                headlineContent = { Text("Save transcripts as Markdown") },
+                supportingContent = { Text("Write a .md file to a folder you choose") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.mdExportEnabled,
+                        onCheckedChange = { settingsViewModel.setMdExportEnabled(it) }
+                    )
+                }
+            )
+
+            ListItem(
+                headlineContent = { Text("Export folder") },
+                supportingContent = { Text(folderLabel(settings.exportFolderUri)) },
+                trailingContent = {
+                    OutlinedButton(onClick = { exportFolderLauncher.launch(null) }) {
+                        Text("Choose")
+                    }
+                }
+            )
+
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text("Markdown content", style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(8.dp))
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    val modes = MdContentMode.entries
+                    modes.forEachIndexed { index, mode ->
+                        SegmentedButton(
+                            selected = settings.mdContentMode == mode,
+                            onClick = { settingsViewModel.setMdContentMode(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size)
+                        ) {
+                            Text(
+                                when (mode) {
+                                    MdContentMode.FINAL -> "Final"
+                                    MdContentMode.RAW -> "Raw ASR"
+                                    MdContentMode.FULL -> "Full"
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            ListItem(
+                headlineContent = { Text("Include metadata header") },
+                supportingContent = { Text("YAML frontmatter (date, app, duration) for Obsidian") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.mdFrontmatter,
+                        onCheckedChange = { settingsViewModel.setMdFrontmatter(it) }
+                    )
+                }
+            )
+
+            ListItem(
+                headlineContent = { Text("Also save audio (WAV)") },
+                supportingContent = { Text("Store the raw recording alongside the transcript") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.audioExportEnabled,
+                        onCheckedChange = { settingsViewModel.setAudioExportEnabled(it) }
+                    )
+                }
+            )
+
+            if (settings.audioExportEnabled) {
+                ListItem(
+                    headlineContent = { Text("Audio folder") },
+                    supportingContent = {
+                        Text(
+                            if (settings.audioFolderUri.isBlank()) "Same as export folder"
+                            else folderLabel(settings.audioFolderUri)
+                        )
+                    },
+                    trailingContent = {
+                        OutlinedButton(onClick = { audioFolderLauncher.launch(null) }) {
+                            Text("Choose")
+                        }
+                    }
+                )
+            }
         }
     }
+}
+
+/** Human-readable label for a persisted SAF tree URI, e.g. "Documents/ParakeetFlow". */
+private fun folderLabel(uriString: String): String {
+    if (uriString.isBlank()) return "No folder selected"
+    val lastSegment = Uri.parse(uriString).lastPathSegment ?: return "Selected folder"
+    val decoded = Uri.decode(lastSegment)
+    return decoded.substringAfter(':', decoded)
 }
