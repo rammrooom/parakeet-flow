@@ -247,6 +247,27 @@ class DictationOrchestrator @Inject constructor(
     }
 
     /**
+     * Pauses the current recording. Audio keeps flowing from the mic but is
+     * dropped until [resumeRecording]. No-op if not recording or already paused.
+     */
+    fun pauseRecording() {
+        if (!isRecording) return
+        audioCaptureManager.pause()
+        serviceBridge.updatePhase(AppPhase.PAUSED)
+        Log.i(TAG, "Recording paused")
+    }
+
+    /**
+     * Resumes a paused recording. No-op if not recording.
+     */
+    fun resumeRecording() {
+        if (!isRecording) return
+        audioCaptureManager.resume()
+        serviceBridge.updatePhase(AppPhase.RECORDING)
+        Log.i(TAG, "Recording resumed")
+    }
+
+    /**
      * Cancels the current recording without processing.
      */
     fun cancelRecording() {

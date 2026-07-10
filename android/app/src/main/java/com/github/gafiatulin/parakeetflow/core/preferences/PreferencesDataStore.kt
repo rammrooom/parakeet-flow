@@ -5,10 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.github.gafiatulin.parakeetflow.core.model.BubblePosition
+import com.github.gafiatulin.parakeetflow.core.model.DEFAULT_BUBBLE_COLOR
 import com.github.gafiatulin.parakeetflow.core.model.MdContentMode
 import com.github.gafiatulin.parakeetflow.core.model.UserSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,6 +43,9 @@ class PreferencesDataStore @Inject constructor(
         val MD_FRONTMATTER = booleanPreferencesKey("md_frontmatter")
         val AUDIO_EXPORT_ENABLED = booleanPreferencesKey("audio_export_enabled")
         val AUDIO_FOLDER_URI = stringPreferencesKey("audio_folder_uri")
+        val BUBBLE_SIZE_DP = intPreferencesKey("bubble_size_dp")
+        val BUBBLE_COLOR = intPreferencesKey("bubble_color")
+        val BUBBLE_OPACITY = floatPreferencesKey("bubble_opacity")
     }
 
     val settings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -65,7 +70,10 @@ class PreferencesDataStore @Inject constructor(
                 ?: MdContentMode.FINAL,
             mdFrontmatter = prefs[Keys.MD_FRONTMATTER] ?: true,
             audioExportEnabled = prefs[Keys.AUDIO_EXPORT_ENABLED] ?: false,
-            audioFolderUri = prefs[Keys.AUDIO_FOLDER_URI] ?: ""
+            audioFolderUri = prefs[Keys.AUDIO_FOLDER_URI] ?: "",
+            bubbleSizeDp = prefs[Keys.BUBBLE_SIZE_DP] ?: 64,
+            bubbleColor = prefs[Keys.BUBBLE_COLOR] ?: DEFAULT_BUBBLE_COLOR,
+            bubbleOpacity = prefs[Keys.BUBBLE_OPACITY] ?: 1f
         )
     }
 
@@ -134,5 +142,17 @@ class PreferencesDataStore @Inject constructor(
 
     suspend fun setAudioFolderUri(uri: String) {
         context.dataStore.edit { it[Keys.AUDIO_FOLDER_URI] = uri }
+    }
+
+    suspend fun setBubbleSizeDp(size: Int) {
+        context.dataStore.edit { it[Keys.BUBBLE_SIZE_DP] = size }
+    }
+
+    suspend fun setBubbleColor(color: Int) {
+        context.dataStore.edit { it[Keys.BUBBLE_COLOR] = color }
+    }
+
+    suspend fun setBubbleOpacity(opacity: Float) {
+        context.dataStore.edit { it[Keys.BUBBLE_OPACITY] = opacity }
     }
 }

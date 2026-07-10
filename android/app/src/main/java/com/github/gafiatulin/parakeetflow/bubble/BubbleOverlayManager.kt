@@ -35,7 +35,7 @@ class BubbleOverlayManager @Inject constructor() {
 
     companion object {
         private const val TAG = "BubbleOverlay"
-        private const val BUBBLE_SIZE_DP = 120  // 64dp bubble + room for pulsation
+        private const val BUBBLE_PADDING_DP = 28  // padding around the visible bubble (pulsation room)
         private const val DISMISS_DISTANCE_DP = 80  // closeable area radius (library default ~67dp)
         private const val CLOSE_BOTTOM_PADDING_DP = 80  // close icon bottom padding
         private const val EDGE_MARGIN_PX = 16
@@ -83,11 +83,16 @@ class BubbleOverlayManager @Inject constructor() {
     fun show(
         context: Context,
         initialPosition: BubblePosition,
+        bubbleSizeDp: Int,
+        bubbleColorArgb: Int,
+        bubbleOpacity: Float,
         onTap: () -> Unit,
         onHoldStart: () -> Unit,
         onHoldEnd: () -> Unit,
         onDismiss: () -> Unit,
-        onPositionChanged: (BubblePosition) -> Unit
+        onPositionChanged: (BubblePosition) -> Unit,
+        onCancel: () -> Unit,
+        onPauseResume: () -> Unit
     ) {
         if (bubbleView != null) return
 
@@ -102,17 +107,18 @@ class BubbleOverlayManager @Inject constructor() {
         screenWidth = bounds.width()
         screenHeight = bounds.height()
         density = context.resources.displayMetrics.density
-        bubbleSizePx = (BUBBLE_SIZE_DP * density).toInt()
+        val containerDp = bubbleSizeDp + BUBBLE_PADDING_DP * 2
+        bubbleSizePx = (containerDp * density).toInt()
         dismissRadiusPx = (DISMISS_DISTANCE_DP * density).toInt()
 
         // Dismiss target = bottom center, matching the dismiss circle position (200dp + 48dp half-icon from bottom)
         dismissCenterX = screenWidth / 2
         dismissCenterY = screenHeight - (248 * density).toInt()
-        maxBubbleY = screenHeight - ((BOTTOM_SAFE_MARGIN_DP + BUBBLE_SIZE_DP) * density).toInt()
+        maxBubbleY = screenHeight - ((BOTTOM_SAFE_MARGIN_DP + containerDp) * density).toInt()
 
-        // The visible bubble (64dp) is centered in a larger container.
+        // The visible bubble is centered in a larger container.
         // Offset default position so the visible circle sits at the screen edge.
-        val containerPaddingPx = ((BUBBLE_SIZE_DP - 64) / 2 * density).toInt()
+        val containerPaddingPx = (BUBBLE_PADDING_DP * density).toInt()
 
         // Allow the visible bubble to be dragged all the way to the top of the
         // screen (over the status bar), matching apps like Whisperian. The
@@ -152,12 +158,17 @@ class BubbleOverlayManager @Inject constructor() {
                 BubbleView(
                     phase = phase.value,
                     dismissProgress = dismissProgress.floatValue,
+                    bubbleSizeDp = bubbleSizeDp,
+                    bubbleColorArgb = bubbleColorArgb,
+                    bubbleOpacity = bubbleOpacity,
                     onTap = onTap,
                     onHoldStart = onHoldStart,
                     onHoldEnd = onHoldEnd,
                     onDragStart = { onDragStarted(context) },
                     onDrag = { delta -> handleDrag(delta) },
-                    onDragEnd = { handleDragEnd() }
+                    onDragEnd = { handleDragEnd() },
+                    onCancel = onCancel,
+                    onPauseResume = onPauseResume
                 )
             }
         }
@@ -236,9 +247,9 @@ class BubbleOverlayManager @Inject constructor() {
     private fun animateSnapToEdge() {
         snapAnim?.cancel()
 
-        // The visible bubble (64dp) is centered in a 120dp container.
+        // The visible bubble is centered in its container.
         // Offset so the visible circle sits flush against the screen edge.
-        val containerPaddingPx = ((BUBBLE_SIZE_DP - 64) / 2 * density).toInt()
+        val containerPaddingPx = (BUBBLE_PADDING_DP * density).toInt()
         val bubbleCenterX = currentX + bubbleSizePx / 2
         val targetX = if (bubbleCenterX < screenWidth / 2) {
             EDGE_MARGIN_PX - containerPaddingPx

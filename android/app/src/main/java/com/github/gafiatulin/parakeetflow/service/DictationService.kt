@@ -41,6 +41,7 @@ class DictationService : Service() {
         const val ACTION_STOP = "com.github.gafiatulin.parakeetflow.STOP"
         const val ACTION_TOGGLE_RECORDING = "com.github.gafiatulin.parakeetflow.TOGGLE"
         const val ACTION_RELOAD = "com.github.gafiatulin.parakeetflow.RELOAD"
+        const val ACTION_REFRESH_BUBBLE = "com.github.gafiatulin.parakeetflow.REFRESH_BUBBLE"
     }
 
     @Inject lateinit var orchestrator: DictationOrchestrator
@@ -90,6 +91,14 @@ class DictationService : Service() {
                 orchestrator.cancelRecording()
                 initializeEngine(force = true)
             }
+            ACTION_REFRESH_BUBBLE -> {
+                // Re-show the bubble so appearance changes (size/color/opacity)
+                // take effect immediately, without reloading the ASR engine.
+                if (bubbleOverlayManager.isShowing) {
+                    bubbleOverlayManager.dismiss()
+                    showBubble()
+                }
+            }
             else -> {
                 Log.w(TAG, "Unknown action: ${intent?.action}")
             }
@@ -122,6 +131,9 @@ class DictationService : Service() {
             bubbleOverlayManager.show(
                 context = this@DictationService,
                 initialPosition = settings.bubblePosition,
+                bubbleSizeDp = settings.bubbleSizeDp,
+                bubbleColorArgb = settings.bubbleColor,
+                bubbleOpacity = settings.bubbleOpacity,
                 onTap = { orchestrator.toggleRecording() },
                 onHoldStart = { orchestrator.startRecording() },
                 onHoldEnd = { orchestrator.stopRecordingAndProcess() },
@@ -133,6 +145,14 @@ class DictationService : Service() {
                 onPositionChanged = { pos ->
                     serviceScope.launch {
                         preferencesDataStore.setBubblePosition(pos)
+                    }
+                },
+                onCancel = { orchestrator.cancelRecording() },
+                onPauseResume = {
+                    if (serviceBridge.phase.value == AppPhase.PAUSED) {
+                        orchestrator.resumeRecording()
+                    } else {
+                        orchestrator.pauseRecording()
                     }
                 }
             )
@@ -155,7 +175,7 @@ class DictationService : Service() {
             serviceBridge.textFieldFocused.collect { focused ->
                 if (!focused && bubbleOverlayManager.isShowing) {
                     val phase = serviceBridge.phase.value
-                    if (phase == AppPhase.RECORDING || phase == AppPhase.PROCESSING || phase == AppPhase.INSERTING) {
+                    if (phase == AppPhase.RECORDING || phase == AppPhase.PAUSED || phase == AppPhase.PROCESSING || phase == AppPhase.INSERTING) {
                         Log.d(TAG, "Focus lost but pipeline active, keeping bubble")
                         return@collect
                     }
@@ -177,6 +197,7 @@ class DictationService : Service() {
                 val text = when (phase) {
                     AppPhase.IDLE -> "ParakeetFlow ready"
                     AppPhase.RECORDING -> "Recording..."
+                    AppPhase.PAUSED -> "Paused"
                     AppPhase.PROCESSING -> "Processing..."
                     AppPhase.INSERTING -> if (serviceBridge.textFieldFocused.value) "Inserting text..." else "Copied to clipboard"
                     AppPhase.ERROR -> "Error occurred"

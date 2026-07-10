@@ -35,6 +35,9 @@ class AudioCaptureManager @Inject constructor(
     private val accumulatedSamples = mutableListOf<FloatArray>()
     private val accumulationLock = Any()
 
+    @Volatile
+    private var paused = false
+
     val hasPermission: Boolean
         get() = ContextCompat.checkSelfPermission(
             context, Manifest.permission.RECORD_AUDIO
@@ -45,6 +48,7 @@ class AudioCaptureManager @Inject constructor(
             throw SecurityException("RECORD_AUDIO permission not granted")
         }
 
+        paused = false
         synchronized(accumulationLock) {
             accumulatedSamples.clear()
         }
@@ -75,13 +79,17 @@ class AudioCaptureManager @Inject constructor(
                     buffer, 0, CHUNK_SIZE_SAMPLES, AudioRecord.READ_BLOCKING
                 )
                 if (readResult > 0) {
-                    val chunk = buffer.copyOf(readResult)
+                    // While paused, keep draining the mic buffer but drop the
+                    // samples so the paused span is skipped in the transcript.
+                    if (!paused) {
+                        val chunk = buffer.copyOf(readResult)
 
-                    synchronized(accumulationLock) {
-                        accumulatedSamples.add(chunk)
+                        synchronized(accumulationLock) {
+                            accumulatedSamples.add(chunk)
+                        }
+
+                        _audioChunks.tryEmit(chunk)
                     }
-
-                    _audioChunks.tryEmit(chunk)
                 } else if (readResult < 0) {
                     break
                 }
@@ -89,7 +97,18 @@ class AudioCaptureManager @Inject constructor(
         }
     }
 
+    /** Pauses accumulation; the microphone keeps running but samples are dropped. */
+    fun pause() {
+        paused = true
+    }
+
+    /** Resumes accumulation after [pause]. */
+    fun resume() {
+        paused = false
+    }
+
     fun stopCapture(): FloatArray {
+        paused = false
         recordingJob?.cancel()
         recordingJob = null
 

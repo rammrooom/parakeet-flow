@@ -71,4 +71,16 @@ class SettingsViewModel @Inject constructor(
     fun setAudioFolderUri(uri: String) {
         viewModelScope.launch { preferencesDataStore.setAudioFolderUri(uri) }
     }
+
+    fun setBubbleSizeDp(size: Int) {
+        viewModelScope.launch { preferencesDataStore.setBubbleSizeDp(size) }
+    }
+
+    fun setBubbleColor(color: Int) {
+        viewModelScope.launch { preferencesDataStore.setBubbleColor(color) }
+    }
+
+    fun setBubbleOpacity(opacity: Float) {
+        viewModelScope.launch { preferencesDataStore.setBubbleOpacity(opacity) }
+    }
 }

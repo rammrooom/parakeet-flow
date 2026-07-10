@@ -18,8 +18,15 @@ data class UserSettings(
     val mdFrontmatter: Boolean = true,
     // Audio (WAV) export
     val audioExportEnabled: Boolean = false,
-    val audioFolderUri: String = ""
+    val audioFolderUri: String = "",
+    // Bubble appearance
+    val bubbleSizeDp: Int = 64,
+    val bubbleColor: Int = DEFAULT_BUBBLE_COLOR,
+    val bubbleOpacity: Float = 1f
 )
+
+/** Default idle bubble color (ParakeetGreen, 0xFF4CAF50) as a packed ARGB int. */
+const val DEFAULT_BUBBLE_COLOR: Int = 0xFF4CAF50.toInt()
 
 data class BubblePosition(val x: Int, val y: Int)
 
