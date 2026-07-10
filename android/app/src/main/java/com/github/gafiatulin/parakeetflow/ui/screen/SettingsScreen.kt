@@ -448,6 +448,20 @@ fun SettingsScreen(
                 }
             }
 
+            ListItem(
+                headlineContent = { Text("Controls beside bubble") },
+                supportingContent = { Text("Show pause/cancel left or right of the bubble (by edge) instead of below") },
+                trailingContent = {
+                    Switch(
+                        checked = settings.bubbleControlsBeside,
+                        onCheckedChange = {
+                            settingsViewModel.setBubbleControlsBeside(it)
+                            refreshBubble()
+                        }
+                    )
+                }
+            )
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Text(

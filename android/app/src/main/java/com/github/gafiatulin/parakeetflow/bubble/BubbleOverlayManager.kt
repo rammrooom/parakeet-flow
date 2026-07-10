@@ -58,6 +58,9 @@ class BubbleOverlayManager @Inject constructor() {
     // State
     val phase = mutableStateOf(AppPhase.IDLE)
     private val dismissProgress = mutableFloatStateOf(0f)
+    private val onRightEdge = mutableStateOf(false)
+    private var controlsBeside = true
+    private var controlsInsetPx = 0
 
     private var screenWidth = 0
     private var screenHeight = 0
@@ -86,6 +89,7 @@ class BubbleOverlayManager @Inject constructor() {
         bubbleSizeDp: Int,
         bubbleColorArgb: Int,
         bubbleOpacity: Float,
+        controlsBeside: Boolean,
         onTap: () -> Unit,
         onHoldStart: () -> Unit,
         onHoldEnd: () -> Unit,
@@ -107,6 +111,8 @@ class BubbleOverlayManager @Inject constructor() {
         screenWidth = bounds.width()
         screenHeight = bounds.height()
         density = context.resources.displayMetrics.density
+        this.controlsBeside = controlsBeside
+        controlsInsetPx = (BUBBLE_CONTROLS_INSET_DP * density).toInt()
         val containerDp = bubbleSizeDp + BUBBLE_PADDING_DP * 2
         bubbleSizePx = (containerDp * density).toInt()
         dismissRadiusPx = (DISMISS_DISTANCE_DP * density).toInt()
@@ -136,6 +142,7 @@ class BubbleOverlayManager @Inject constructor() {
             currentX = screenWidth - bubbleSizePx - EDGE_MARGIN_PX + containerPaddingPx
             currentY = screenHeight / 2 - bubbleSizePx / 2
         }
+        onRightEdge.value = currentX + bubbleSizePx / 2 >= screenWidth / 2
 
         // Use TOP|LEFT gravity for straightforward coordinate math
         val params = createOverlayParams(
@@ -161,6 +168,8 @@ class BubbleOverlayManager @Inject constructor() {
                     bubbleSizeDp = bubbleSizeDp,
                     bubbleColorArgb = bubbleColorArgb,
                     bubbleOpacity = bubbleOpacity,
+                    controlsBeside = controlsBeside,
+                    onRightEdge = onRightEdge.value,
                     onTap = onTap,
                     onHoldStart = onHoldStart,
                     onHoldEnd = onHoldEnd,
@@ -251,7 +260,9 @@ class BubbleOverlayManager @Inject constructor() {
         // Offset so the visible circle sits flush against the screen edge.
         val containerPaddingPx = (BUBBLE_PADDING_DP * density).toInt()
         val bubbleCenterX = currentX + bubbleSizePx / 2
-        val targetX = if (bubbleCenterX < screenWidth / 2) {
+        val snapToRight = bubbleCenterX >= screenWidth / 2
+        onRightEdge.value = snapToRight
+        val targetX = if (!snapToRight) {
             EDGE_MARGIN_PX - containerPaddingPx
         } else {
             screenWidth - bubbleSizePx - EDGE_MARGIN_PX + containerPaddingPx
@@ -283,7 +294,12 @@ class BubbleOverlayManager @Inject constructor() {
         val wm = windowManager ?: return
         val view = bubbleView ?: return
 
-        params.x = currentX
+        // When the controls sit to the LEFT of the bubble (bubble on the right
+        // edge), the overlay window grows leftward. Shift the window origin left
+        // by the exact cluster width so the bubble stays put on screen.
+        val controlsVisible = phase.value == AppPhase.RECORDING || phase.value == AppPhase.PAUSED
+        val offsetForControls = controlsBeside && controlsVisible && onRightEdge.value
+        params.x = if (offsetForControls) currentX - controlsInsetPx else currentX
         params.y = currentY
         try {
             wm.updateViewLayout(view, params)
@@ -360,6 +376,8 @@ class BubbleOverlayManager @Inject constructor() {
 
     fun updatePhase(newPhase: AppPhase) {
         phase.value = newPhase
+        // Re-apply the window offset now that controls may have appeared/vanished.
+        updateBubblePosition()
     }
 
     val isShowing: Boolean

@@ -134,6 +134,7 @@ class DictationService : Service() {
                 bubbleSizeDp = settings.bubbleSizeDp,
                 bubbleColorArgb = settings.bubbleColor,
                 bubbleOpacity = settings.bubbleOpacity,
+                controlsBeside = settings.bubbleControlsBeside,
                 onTap = { orchestrator.toggleRecording() },
                 onHoldStart = { orchestrator.startRecording() },
                 onHoldEnd = { orchestrator.stopRecordingAndProcess() },

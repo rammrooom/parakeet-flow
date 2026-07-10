@@ -22,7 +22,10 @@ data class UserSettings(
     // Bubble appearance
     val bubbleSizeDp: Int = 64,
     val bubbleColor: Int = DEFAULT_BUBBLE_COLOR,
-    val bubbleOpacity: Float = 1f
+    val bubbleOpacity: Float = 1f,
+    // When recording, show the pause/cancel controls beside the bubble (on the
+    // side toward screen center) instead of below it.
+    val bubbleControlsBeside: Boolean = true
 )
 
 /** Default idle bubble color (ParakeetGreen, 0xFF4CAF50) as a packed ARGB int. */

@@ -46,6 +46,7 @@ class PreferencesDataStore @Inject constructor(
         val BUBBLE_SIZE_DP = intPreferencesKey("bubble_size_dp")
         val BUBBLE_COLOR = intPreferencesKey("bubble_color")
         val BUBBLE_OPACITY = floatPreferencesKey("bubble_opacity")
+        val BUBBLE_CONTROLS_BESIDE = booleanPreferencesKey("bubble_controls_beside")
     }
 
     val settings: Flow<UserSettings> = context.dataStore.data.map { prefs ->
@@ -73,7 +74,8 @@ class PreferencesDataStore @Inject constructor(
             audioFolderUri = prefs[Keys.AUDIO_FOLDER_URI] ?: "",
             bubbleSizeDp = prefs[Keys.BUBBLE_SIZE_DP] ?: 64,
             bubbleColor = prefs[Keys.BUBBLE_COLOR] ?: DEFAULT_BUBBLE_COLOR,
-            bubbleOpacity = prefs[Keys.BUBBLE_OPACITY] ?: 1f
+            bubbleOpacity = prefs[Keys.BUBBLE_OPACITY] ?: 1f,
+            bubbleControlsBeside = prefs[Keys.BUBBLE_CONTROLS_BESIDE] ?: true
         )
     }
 
@@ -154,5 +156,9 @@ class PreferencesDataStore @Inject constructor(
 
     suspend fun setBubbleOpacity(opacity: Float) {
         context.dataStore.edit { it[Keys.BUBBLE_OPACITY] = opacity }
+    }
+
+    suspend fun setBubbleControlsBeside(beside: Boolean) {
+        context.dataStore.edit { it[Keys.BUBBLE_CONTROLS_BESIDE] = beside }
     }
 }

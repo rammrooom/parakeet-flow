@@ -83,4 +83,8 @@ class SettingsViewModel @Inject constructor(
     fun setBubbleOpacity(opacity: Float) {
         viewModelScope.launch { preferencesDataStore.setBubbleOpacity(opacity) }
     }
+
+    fun setBubbleControlsBeside(beside: Boolean) {
+        viewModelScope.launch { preferencesDataStore.setBubbleControlsBeside(beside) }
+    }
 }

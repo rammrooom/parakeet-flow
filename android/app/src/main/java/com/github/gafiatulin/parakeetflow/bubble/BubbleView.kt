@@ -47,8 +47,78 @@ private const val LONG_PRESS_MS = 300L
 private const val TAP_SLOP_PX = 30f
 private const val PRESSURE_THRESHOLD = 0.3f
 
+// Control-button geometry, shared with BubbleOverlayManager so it can offset the
+// overlay window by exactly the cluster width when controls sit left of the bubble.
+internal const val BUBBLE_CONTROL_BUTTON_DP = 44
+internal const val BUBBLE_CONTROL_GAP_DP = 12
+internal const val BUBBLE_CONTROLS_BUBBLE_GAP_DP = 8
+internal const val BUBBLE_CONTROLS_CLUSTER_DP = BUBBLE_CONTROL_BUTTON_DP * 2 + BUBBLE_CONTROL_GAP_DP
+internal const val BUBBLE_CONTROLS_INSET_DP = BUBBLE_CONTROLS_CLUSTER_DP + BUBBLE_CONTROLS_BUBBLE_GAP_DP
+
 @Composable
 fun BubbleView(
+    phase: AppPhase,
+    dismissProgress: Float,
+    bubbleSizeDp: Int,
+    bubbleColorArgb: Int,
+    bubbleOpacity: Float,
+    controlsBeside: Boolean,
+    onRightEdge: Boolean,
+    onTap: () -> Unit,
+    onHoldStart: () -> Unit,
+    onHoldEnd: () -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onCancel: () -> Unit,
+    onPauseResume: () -> Unit
+) {
+    val showControls = phase == AppPhase.RECORDING || phase == AppPhase.PAUSED
+
+    val bubble = @Composable {
+        DictationBubble(
+            phase = phase,
+            dismissProgress = dismissProgress,
+            bubbleSizeDp = bubbleSizeDp,
+            bubbleColorArgb = bubbleColorArgb,
+            bubbleOpacity = bubbleOpacity,
+            onTap = onTap,
+            onHoldStart = onHoldStart,
+            onHoldEnd = onHoldEnd,
+            onDragStart = onDragStart,
+            onDrag = onDrag,
+            onDragEnd = onDragEnd
+        )
+    }
+    val controls = @Composable {
+        BubbleControls(phase = phase, onCancel = onCancel, onPauseResume = onPauseResume)
+    }
+
+    val gap = Arrangement.spacedBy(BUBBLE_CONTROLS_BUBBLE_GAP_DP.dp)
+    when {
+        !showControls -> bubble()
+        // Controls below the bubble
+        !controlsBeside -> Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = gap
+        ) {
+            bubble()
+            controls()
+        }
+        // Controls beside the bubble, on the inward side (toward screen center)
+        onRightEdge -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = gap) {
+            controls()
+            bubble()
+        }
+        else -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = gap) {
+            bubble()
+            controls()
+        }
+    }
+}
+
+@Composable
+private fun DictationBubble(
     phase: AppPhase,
     dismissProgress: Float,
     bubbleSizeDp: Int,
@@ -59,9 +129,7 @@ fun BubbleView(
     onHoldEnd: () -> Unit,
     onDragStart: () -> Unit,
     onDrag: (Offset) -> Unit,
-    onDragEnd: () -> Unit,
-    onCancel: () -> Unit,
-    onPauseResume: () -> Unit
+    onDragEnd: () -> Unit
 ) {
     val bgColor by animateColorAsState(
         targetValue = when (phase) {
@@ -107,121 +175,125 @@ fun BubbleView(
     // overlay geometry math in BubbleOverlayManager stays consistent.
     val containerSize = (bubbleSizeDp + 56).dp
     val iconSize = (bubbleSizeDp * 30 / 64).dp
-    val showControls = phase == AppPhase.RECORDING || phase == AppPhase.PAUSED
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Box(
+        modifier = Modifier.size(containerSize),
+        contentAlignment = Alignment.Center
+    ) {
         Box(
-            modifier = Modifier.size(containerSize),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(visibleSize)
-                    .scale(animScale)
-                    .alpha(bubbleOpacity)
-                    .shadow(4.dp, CircleShape)
-                    .background(bgColor, CircleShape)
-                    .pointerInput(Unit) {
-                        coroutineScope {
-                            awaitPointerEventScope {
+            modifier = Modifier
+                .size(visibleSize)
+                .scale(animScale)
+                .alpha(bubbleOpacity)
+                .shadow(4.dp, CircleShape)
+                .background(bgColor, CircleShape)
+                .pointerInput(Unit) {
+                    coroutineScope {
+                        awaitPointerEventScope {
+                            while (true) {
+                                // Wait for finger down
+                                val down = awaitPointerEvent()
+                                if (down.type != PointerEventType.Press) continue
+                                val downId = down.changes.firstOrNull()?.id ?: continue
+                                val downPressure = down.changes.first().pressure
+
+                                var isDragging = false
+                                var isHolding = false
+                                var released = false
+                                var totalDrag = Offset.Zero
+
+                                // Launch a timer for long press detection
+                                val longPressJob = launch {
+                                    delay(LONG_PRESS_MS)
+                                    if (!isDragging && !released && downPressure >= PRESSURE_THRESHOLD) {
+                                        isHolding = true
+                                        isHoldMode = true
+                                        onHoldStart()
+                                    }
+                                }
+
+                                // Track movement until release
                                 while (true) {
-                                    // Wait for finger down
-                                    val down = awaitPointerEvent()
-                                    if (down.type != PointerEventType.Press) continue
-                                    val downId = down.changes.firstOrNull()?.id ?: continue
-                                    val downPressure = down.changes.first().pressure
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == downId }
 
-                                    var isDragging = false
-                                    var isHolding = false
-                                    var released = false
-                                    var totalDrag = Offset.Zero
+                                    if (change == null || !change.pressed) {
+                                        // Finger lifted
+                                        released = true
+                                        longPressJob.cancel()
 
-                                    // Launch a timer for long press detection
-                                    val longPressJob = launch {
-                                        delay(LONG_PRESS_MS)
-                                        if (!isDragging && !released && downPressure >= PRESSURE_THRESHOLD) {
-                                            isHolding = true
-                                            isHoldMode = true
-                                            onHoldStart()
+                                        when {
+                                            isDragging -> onDragEnd()
+                                            isHolding -> {
+                                                isHoldMode = false
+                                                onHoldEnd()
+                                            }
+                                            else -> onTap()
                                         }
+                                        // Consume remaining changes
+                                        event.changes.forEach { it.consume() }
+                                        break
                                     }
 
-                                    // Track movement until release
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == downId }
+                                    val delta = change.position - (change.previousPosition)
+                                    totalDrag += delta
 
-                                        if (change == null || !change.pressed) {
-                                            // Finger lifted
-                                            released = true
+                                    if (!isDragging && !isHolding) {
+                                        // Check if moved beyond tap slop → start drag
+                                        if (abs(totalDrag.x) > TAP_SLOP_PX || abs(totalDrag.y) > TAP_SLOP_PX) {
                                             longPressJob.cancel()
-
-                                            when {
-                                                isDragging -> onDragEnd()
-                                                isHolding -> {
-                                                    isHoldMode = false
-                                                    onHoldEnd()
-                                                }
-                                                else -> onTap()
-                                            }
-                                            // Consume remaining changes
-                                            event.changes.forEach { it.consume() }
-                                            break
+                                            isDragging = true
+                                            onDragStart()
                                         }
-
-                                        val delta = change.position - (change.previousPosition)
-                                        totalDrag += delta
-
-                                        if (!isDragging && !isHolding) {
-                                            // Check if moved beyond tap slop → start drag
-                                            if (abs(totalDrag.x) > TAP_SLOP_PX || abs(totalDrag.y) > TAP_SLOP_PX) {
-                                                longPressJob.cancel()
-                                                isDragging = true
-                                                onDragStart()
-                                            }
-                                        }
-
-                                        if (isDragging) {
-                                            onDrag(delta)
-                                        }
-
-                                        change.consume()
                                     }
+
+                                    if (isDragging) {
+                                        onDrag(delta)
+                                    }
+
+                                    change.consume()
                                 }
                             }
                         }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = when (phase) {
-                        AppPhase.RECORDING -> Icons.Default.Mic
-                        AppPhase.PAUSED -> Icons.Default.Pause
-                        AppPhase.PROCESSING -> Icons.Default.Sync
-                        else -> Icons.Default.MicOff
-                    },
-                    contentDescription = "Dictation",
-                    tint = Color.White,
-                    modifier = Modifier.size(iconSize)
-                )
-            }
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = when (phase) {
+                    AppPhase.RECORDING -> Icons.Default.Mic
+                    AppPhase.PAUSED -> Icons.Default.Pause
+                    AppPhase.PROCESSING -> Icons.Default.Sync
+                    else -> Icons.Default.MicOff
+                },
+                contentDescription = "Dictation",
+                tint = Color.White,
+                modifier = Modifier.size(iconSize)
+            )
         }
+    }
+}
 
-        // Pause/resume and cancel controls while a recording is active
-        if (showControls) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                BubbleControlButton(
-                    icon = Icons.Default.Close,
-                    contentDescription = "Cancel",
-                    onClick = onCancel
-                )
-                BubbleControlButton(
-                    icon = if (phase == AppPhase.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
-                    contentDescription = if (phase == AppPhase.PAUSED) "Resume" else "Pause",
-                    onClick = onPauseResume
-                )
-            }
-        }
+@Composable
+private fun BubbleControls(
+    phase: AppPhase,
+    onCancel: () -> Unit,
+    onPauseResume: () -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(BUBBLE_CONTROL_GAP_DP.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        BubbleControlButton(
+            icon = Icons.Default.Close,
+            contentDescription = "Cancel",
+            onClick = onCancel
+        )
+        BubbleControlButton(
+            icon = if (phase == AppPhase.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
+            contentDescription = if (phase == AppPhase.PAUSED) "Resume" else "Pause",
+            onClick = onPauseResume
+        )
     }
 }
 
@@ -233,7 +305,7 @@ private fun BubbleControlButton(
 ) {
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(BUBBLE_CONTROL_BUTTON_DP.dp)
             .shadow(4.dp, CircleShape)
             .background(Color.Black.copy(alpha = 0.55f), CircleShape)
             .clickable(onClick = onClick),
