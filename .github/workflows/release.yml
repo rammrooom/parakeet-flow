@@ -55,6 +55,11 @@ jobs:
             echo "RELEASE_KEY_PASSWORD=$GEN_PASSWORD" >> "$GITHUB_ENV"
           fi
 
+      - name: Compute version
+        run: |
+          echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
